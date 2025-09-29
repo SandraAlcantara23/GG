@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filtros Imagen</title>
+</head>
+<body>
+    <h3>Elige un filtro:</h3>
+    <select id="filtro">
+        <option value="blancoYNegro">Blanco y Negro</option>
+        <option value="invertir">Invertir colores</option>
+        <option value="sepia">Sepia</option>
+        <option value="brillo">Brillo</option>
+        <option value="contraste">Contraste</option>
+        <option value="blur">Desenfoque</option>
+        <option value="sobel">Sobel (bordes)</option>
+        <option value="sharpen">Mejorar (Sharpen)</option>
+        <option value="autoEnhance">Auto-Enhance</option>
+        <option value="hdr">HDR Fake</option>
+        <option value="saturar">Saturación +50%</option>
+        <option value="desaturar">Desaturación suave</option>
+    </select>
+    <button onclick="aplicarFiltro()">Aplicar</button>
+
+```
+<br><br>
+<canvas id="canvas"></canvas>
+<canvas id="resultado"></canvas>
+
+<script>
+    var image = new Image();
+    image.onload = imageLoaded;
+    image.src = "Mi.jpg";
+
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext("2d");
+    var resultado = document.getElementById("resultado");
+    var ctxRes = resultado.getContext("2d");
+
+    function imageLoaded(){
+        canvas.width = image.width;
+        canvas.height = image.height;
+        resultado.width = image.width;
+        resultado.height = image.height;
+        ctx.drawImage(image, 0, 0);
+    }
+
+    function aplicarFiltro(){
+        ctx.drawImage(image, 0, 0); // restaurar original
+        let filtro = document.getElementById("filtro").value;
+        if(filtro === "blancoYNegro") blancoYNegro(canvas, resultado);
+        if(filtro === "invertir") invertir(canvas, resultado);
+        if(filtro === "sepia") sepia(canvas, resultado);
+        if(filtro === "brillo") brillo(canvas, resultado, 50);
+        if(filtro === "contraste") contraste(canvas, resultado, 50);
+        if(filtro === "blur") blur(canvas, resultado);
+        if(filtro === "sobel") convolucionar(canvas, resultado);
+        if(filtro === "sharpen") sharpen(canvas, resultado);
+        if(filtro === "autoEnhance") autoEnhance(canvas, resultado);
+        if(filtro === "hdr") hdr(canvas, resultado);
+        if(filtro === "saturar") saturar(canvas, resultado);
+        if(filtro === "desaturar") desaturar(canvas, resultado);
+    }
+
+    function blancoYNegro(src, dst){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        for(let i=0;i<d.length;i+=4){
+            let gris = (d[i]+d[i+1]+d[i+2])/3;
+            d[i]=d[i+1]=d[i+2]=gris;
+        }
+        ctxRes.putImageData(imgData,0,0);
+    }
+
+    function invertir(src, dst){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        for(let i=0;i<d.length;i+=4){
+            d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2];
+        }
+        ctxRes.putImageData(imgData,0,0);
+    }
+
+    function sepia(src, dst){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        for(let i=0;i<d.length;i+=4){
+            let r=d[i], g=d[i+1], b=d[i+2];
+            d[i]   = Math.min(255, 0.393*r + 0.769*g + 0.189*b);
+            d[i+1] = Math.min(255, 0.349*r + 0.686*g + 0.168*b);
+            d[i+2] = Math.min(255, 0.272*r + 0.534*g + 0.131*b);
+        }
+        ctxRes.putImageData(imgData,0,0);
+    }
+
+    function brillo(src, dst, val){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        for(let i=0;i<d.length;i+=4){
+            d[i]+=val; d[i+1]+=val; d[i+2]+=val;
+        }
+        ctxRes.putImageData(imgData,0,0);
+    }
+
+    function contraste(src, dst, val){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        let factor = (259*(val+255))/(255*(259-val));
+        for(let i=0;i<d.length;i+=4){
+            d[i]   = factor*(d[i]-128)+128;
+            d[i+1] = factor*(d[i+1]-128)+128;
+            d[i+2] = factor*(d[i+2]-128)+128;
+        }
+        ctxRes.putImageData(imgData,0,0);
+    }
+
+    function blur(src, dst){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        let imgDataOut = ctx.createImageData(src.width, src.height);
+        let o = imgDataOut.data;
+
+        let kernel = [
+            [1,1,1],
+            [1,1,1],
+            [1,1,1]
+        ];
+        let divisor = 9;
+
+        for(let y=1;y<src.height-1;y++){
+            for(let x=1;x<src.width-1;x++){
+                let r=0,g=0,b=0;
+                for(let ky=-1;ky<=1;ky++){
+                    for(let kx=-1;kx<=1;kx++){
+                        let idx = ((y+ky)*src.width + (x+kx))*4;
+                        r += d[idx]*kernel[ky+1][kx+1];
+                        g += d[idx+1]*kernel[ky+1][kx+1];
+                        b += d[idx+2]*kernel[ky+1][kx+1];
+                    }
+                }
+                let idxOut = (y*src.width+x)*4;
+                o[idxOut]   = r/divisor;
+                o[idxOut+1] = g/divisor;
+                o[idxOut+2] = b/divisor;
+                o[idxOut+3] = 255;
+            }
+        }
+        ctxRes.putImageData(imgDataOut,0,0);
+    }
+
+    function sharpen(src, dst){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        let imgDataOut = ctx.createImageData(src.width, src.height);
+        let o = imgDataOut.data;
+
+        let kernel = [
+            [ 0, -1,  0],
+            [-1,  5, -1],
+            [ 0, -1,  0]
+        ];
+
+        for(let y=1;y<src.height-1;y++){
+            for(let x=1;x<src.width-1;x++){
+                let r=0,g=0,b=0;
+                for(let ky=-1;ky<=1;ky++){
+                    for(let kx=-1;kx<=1;kx++){
+                        let idx = ((y+ky)*src.width + (x+kx))*4;
+                        let peso = kernel[ky+1][kx+1];
+                        r += d[idx]*peso;
+                        g += d[idx+1]*peso;
+                        b += d[idx+2]*peso;
+                    }
+                }
+                let idxOut = (y*src.width+x)*4;
+                o[idxOut]   = Math.min(255,Math.max(0,r));
+                o[idxOut+1] = Math.min(255,Math.max(0,g));
+                o[idxOut+2] = Math.min(255,Math.max(0,b));
+                o[idxOut+3] = 255;
+            }
+        }
+        ctxRes.putImageData(imgDataOut,0,0);
+    }
+
+    function autoEnhance(src, dst){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        let factor = (259*(40+255))/(255*(259-40)); // contraste +40
+        for(let i=0;i<d.length;i+=4){
+            d[i]+=20; d[i+1]+=20; d[i+2]+=20; // brillo
+            d[i]   = factor*(d[i]-128)+128;
+            d[i+1] = factor*(d[i+1]-128)+128;
+            d[i+2] = factor*(d[i+2]-128)+128;
+            let avg=(d[i]+d[i+1]+d[i+2])/3; // saturación ligera
+            d[i]=avg+1.2*(d[i]-avg);
+            d[i+1]=avg+1.2*(d[i+1]-avg);
+            d[i+2]=avg+1.2*(d[i+2]-avg);
+        }
+        ctxRes.putImageData(imgData,0,0);
+    }
+
+    function hdr(src, dst){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        for(let i=0;i<d.length;i+=4){
+            d[i]   = Math.min(255, (d[i]*1.3) - 30);
+            d[i+1] = Math.min(255, (d[i+1]*1.3) - 30);
+            d[i+2] = Math.min(255, (d[i+2]*1.3) - 30);
+        }
+        ctxRes.putImageData(imgData,0,0);
+    }
+
+    function saturar(src, dst){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        for(let i=0;i<d.length;i+=4){
+            let avg=(d[i]+d[i+1]+d[i+2])/3;
+            d[i]=avg+1.5*(d[i]-avg);
+            d[i+1]=avg+1.5*(d[i+1]-avg);
+            d[i+2]=avg+1.5*(d[i+2]-avg);
+        }
+        ctxRes.putImageData(imgData,0,0);
+    }
+
+    function desaturar(src, dst){
+        let imgData = ctx.getImageData(0,0,src.width,src.height);
+        let d = imgData.data;
+        for(let i=0;i<d.length;i+=4){
+            let avg=(d[i]+d[i+1]+d[i+2])/3;
+            d[i]=avg+0.5*(d[i]-avg);
+            d[i+1]=avg+0.5*(d[i+1]-avg);
+            d[i+2]=avg+0.5*(d[i+2]-avg);
+        }
+        ctxRes.putImageData(imgData,0,0);
+    }
+
+    function convolucionar(canvasFuente, CanvasDestino){
+        var ctxFuente = canvasFuente.getContext("2d");
+        var imgDataFuente = ctxFuente.getImageData(0, 0, canvasFuente.width, canvasFuente.height);
+        var pixelesFuente = imgDataFuente.data;
+        CanvasDestino.width  = canvasFuente.width;
+        CanvasDestino.height = canvasFuente.height;
+        var ctxDestino = CanvasDestino.getContext("2d");
+        var imgDataDestino = ctxDestino.getImageData(0, 0, CanvasDestino.width, CanvasDestino.height);
+        var pixelesDestino = imgDataDestino.data;
+
+        var sobelVertical = [[-1,0,1],[-2,0,2],[-1,0,1]];
+        var sobelHorizontal = [[-1,-2,-1],[0,0,0],[1,2,1]];
+
+        for(var y=1;y<canvasFuente.height-1;y++){
+            for(var x=1;x<canvasFuente.width-1;x++){
+                var idx = ((y*canvasFuente.width)+x)*4;
+                var gy=0,gx=0;
+                for(var ky=-1;ky<=1;ky++){
+                    for(var kx=-1;kx<=1;kx++){
+                        var pesoY=sobelVertical[ky+1][kx+1];
+                        var pesoX=sobelHorizontal[ky+1][kx+1];
+                        var idx2 = (((y+ky)*canvasFuente.width)+(x+kx))*4;
+                        gy+=pesoY*pixelesFuente[idx2];
+                        gx+=pesoX*pixelesFuente[idx2];
+                    }
+                }
+                var mag = Math.sqrt(gx*gx+gy*gy);
+                var val = Math.max(0, Math.min(255, mag));
+                pixelesDestino[idx]=pixelesDestino[idx+1]=pixelesDestino[idx+2]=val;
+                pixelesDestino[idx+3]=255;
+            }
+        }
+        ctxDestino.putImageData(imgDataDestino,0,0);
+    }
+</script>
+```
+
+</body>
+</html>
